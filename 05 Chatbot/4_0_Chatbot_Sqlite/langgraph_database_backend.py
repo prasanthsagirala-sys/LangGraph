@@ -67,8 +67,20 @@ prompt = PromptTemplate(
 
 summary_title_chain = prompt | summary_tilte_model
 
-config = {'configurable':{'thread_id':'thread-1'}}
-#response = chatbot.invoke({'messages': [HumanMessage(content = 'Hi my name is Prasanth')]}, config = config) #This reponse will be saved in db
-response = chatbot.invoke({'messages': [HumanMessage(content = 'what is my name?')]}, config = config) #This can answer my name as previous response got saved the messages in db
-print(response) 
+# config = {'configurable':{'thread_id':'thread-1'}}
+# #response = chatbot.invoke({'messages': [HumanMessage(content = 'Hi my name is Prasanth')]}, config = config) #This reponse will be saved in db
+# response = chatbot.invoke({'messages': [HumanMessage(content = 'what is my name?')]}, config = config) #This can answer my name as previous response got saved the messages in db
+# #print(response) 
 
+# #Please open the chatbot.db in DB browser to see the saved messages. Refer column Checkpoint 
+
+# config = {'configurable':{'thread_id':'thread-2'}}
+# response = chatbot.invoke({'messages': [HumanMessage(content = 'Hi my name is Geetha')]}, config = config) #This reponse will be saved in db
+# #response = chatbot.invoke({'messages': [HumanMessage(content = 'what is my name?')]}, config = config) #This can answer my name as previous response got saved the messages in db
+# print(response) 
+
+def retrieve_all_threads():
+    all_threads = set()
+    for cp in checkpointer.list(None):
+        all_threads.add(cp.config['configurable']['thread_id']) #Gets all the checkpoint ids saved in the db
+    return list(all_threads)
