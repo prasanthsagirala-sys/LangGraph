@@ -1,0 +1,19 @@
+Essay Evaluation Graph 
+
+Should do the following
+
+1. COT (Clarity of Thought):
+    - Return Text Feedback and score 0-10
+2. DOA (Depth of Analysis):
+    - Return Text Feedback and score 0-10
+3. Language
+    - Return Text Feedback and score 0-10
+
+Final Evaluation
+    - Merge all above three feedbacks and return a summary 
+    - Get Avg Score from above 3
+
+We will be using:
+    - Parallel Workflow (to run above 3 tasks in parallel)
+    - Structured Output (to return feedback as text and score as number)
+    - Reducer Functionality (to append the scores and calculate avg at the end)

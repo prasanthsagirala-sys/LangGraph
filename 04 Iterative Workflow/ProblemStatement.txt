@@ -1,0 +1,6 @@
+Post a good post in a social media platform. Iterate through the post to see for any any improvements to finalise the post.
+
+Flow: Generate Post -> Evaluate. 
+            If needs improvement, Generate again/improve the post and Evaluate again. 
+            This step repeats until Evaluator says, All good.
+            If doesn't need improvements, Post it on Social Media 
