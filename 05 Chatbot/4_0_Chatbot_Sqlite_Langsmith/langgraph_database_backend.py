@@ -15,6 +15,9 @@ from pprint import pprint
 from dotenv import load_dotenv
 import sqlite3
 
+import os 
+os.environ['LANGSMITH_PROJECT'] = 'ChatBot' #To track all LangGraph runs under this project in LangSmith UI
+
 load_dotenv() 
 
 model = ChatOpenAI(model = 'gpt-5.1')

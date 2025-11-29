@@ -3,7 +3,7 @@ import streamlit as st
 
 from langgraph_database_backend import chatbot, summary_title_chain, retrieve_all_threads, save_thread_name, get_thread_name, get_all_thread_names
 from langchain_core.messages import HumanMessage
-
+from langsmith import traceable
 import random
 
 import uuid 
@@ -26,6 +26,7 @@ def add_thread(thread_id):
         st.session_state['chat_threads'].append(thread_id)
         set_thread_title(thread_id)
 
+#@traceable(name = "Set Thread Title", metadata={'thread_id': thread_id})
 def set_thread_title(thread_id):
     if thread_id in st.session_state['chat_threads'] and st.session_state['message_history']:
         messages = random.sample(st.session_state['message_history'], min(10, len(st.session_state['message_history'])))
@@ -114,7 +115,12 @@ if user_input:
         st.text(user_input)
     
     with st.chat_message('assistant'):
-        CONFIG = {'configurable':{'thread_id': st.session_state['thread_id']}}
+        CONFIG = {'configurable':{'thread_id': st.session_state['thread_id']},
+                  'metadata': {
+                      'thread_id': st.session_state['thread_id']
+                  },
+                  'run_name': 'assistant response'
+                  }
         stream = chatbot.stream(
             {'messages': [HumanMessage(content = user_input)]}, 
             config = CONFIG,
