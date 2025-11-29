@@ -2,11 +2,14 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.graph import message
 from langgraph.graph.message import add_messages
 from langgraph.checkpoint.sqlite import SqliteSaver
+from langgraph.prebuilt import ToolNode, tools_condition
 
 from langchain_openai import ChatOpenAI
 from langchain_core.prompts import PromptTemplate, prompt
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, BaseMessage
+from langchain_community.tools import DuckDuckGoSearchRun
+from langchain_core.tools import tool
 
 import operator
 from typing import Literal, TypedDict, Annotated
@@ -14,6 +17,7 @@ from pydantic import Field, BaseModel
 from pprint import pprint 
 from dotenv import load_dotenv
 import sqlite3
+import requests
 
 import os 
 os.environ['LANGSMITH_PROJECT'] = 'ChatBot' #To track all LangGraph runs under this project in LangSmith UI
@@ -22,17 +26,69 @@ load_dotenv()
 
 model = ChatOpenAI(model = 'gpt-5.1')
 
+
+# -------------------
+# 2. Tools
+# -------------------
+# Tools
+search_tool = DuckDuckGoSearchRun(region="us-en")
+
+@tool
+def calculator(first_num: float, second_num: float, operation: str) -> dict:
+    """
+    Perform a basic arithmetic operation on two numbers.
+    Supported operations: add, sub, mul, div
+    """
+    try:
+        if operation == "add":
+            result = first_num + second_num
+        elif operation == "sub":
+            result = first_num - second_num
+        elif operation == "mul":
+            result = first_num * second_num
+        elif operation == "div":
+            if second_num == 0:
+                return {"error": "Division by zero is not allowed"}
+            result = first_num / second_num
+        else:
+            return {"error": f"Unsupported operation '{operation}'"}
+        
+        return {"first_num": first_num, "second_num": second_num, "operation": operation, "result": result}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+
+
+@tool
+def get_stock_price(symbol: str) -> dict:
+    """
+    Fetch latest stock price for a given symbol (e.g. 'AAPL', 'TSLA') 
+    using Alpha Vantage with API key in the URL.
+    """
+    alphavantage_api_key = os.environ['alphavantage_api_key'] 
+    url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={symbol}&apikey={alphavantage_api_key}"
+    r = requests.get(url)
+    return r.json()
+
+
+
+tools = [search_tool, get_stock_price, calculator]
+llm_with_tools = model.bind_tools(tools)
+
 class ChatState(TypedDict):
     messages: Annotated[list[BaseMessage], add_messages]
 
 def chat_node(state: ChatState):
     messages = state['messages']
-    response = model.invoke(messages)
+    response = llm_with_tools.invoke(messages)
     return {'messages':[response]}
+
+tool_node = ToolNode(tools)
 
 #Checkpointer
 path = os.path.join(os.path.dirname(__file__), 'chatbot.db')
-conn = sqlite3.connect(database=path, check_same_thread=False)  #Make it multi thread accessible
+conn = sqlite3.connect(database=path, check_same_thread=False)
 checkpointer = SqliteSaver(conn)
 
 # Create thread_names table if it doesn't exist
@@ -50,12 +106,16 @@ conn.commit()
 graph = StateGraph(ChatState)
 
 #nodes
-graph.add_node('chat_node',chat_node)
+graph = StateGraph(ChatState)
+graph.add_node("chat_node", chat_node)
+graph.add_node("tools", tool_node)
 
-graph.add_edge(START, 'chat_node')
-graph.add_edge('chat_node',END)
+graph.add_edge(START, "chat_node")
 
-chatbot = graph.compile(checkpointer= checkpointer)
+graph.add_conditional_edges("chat_node",tools_condition)
+graph.add_edge('tools', 'chat_node')
+
+chatbot = graph.compile(checkpointer=checkpointer)
 
 # #Instead of .invoke, call .stream 
 # # Stream uses generator to generate chunks one by one 
@@ -130,3 +190,10 @@ def get_all_thread_names():
 # print(retrieve_all_threads())
 #print(get_all_thread_names())
 # print(get_thread_name('7aef5e9d-2b52-4b4a-9d09-9e86d749d39c'))
+
+# out = chatbot.invoke(
+#     {'messages': [HumanMessage(content = 'what is stock price of facebook today?')]}, 
+#     config = {'configurable':{'thread_id':'thread-1'}}
+# )
+
+# print(out['messages'][-1].content)
