@@ -31,6 +31,18 @@ def chat_node(state: ChatState):
 conn = sqlite3.connect(database='chatbot.db', check_same_thread=False)  #Make it multi thread accessible
 checkpointer = SqliteSaver(conn)
 
+# Create thread_names table if it doesn't exist
+cursor = conn.cursor()
+cursor.execute('''
+    CREATE TABLE IF NOT EXISTS thread_names (
+        thread_id TEXT PRIMARY KEY,
+        thread_name TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+''')
+conn.commit()
+
 graph = StateGraph(ChatState)
 
 #nodes
@@ -84,3 +96,33 @@ def retrieve_all_threads():
     for cp in checkpointer.list(None):
         all_threads.add(cp.config['configurable']['thread_id']) #Gets all the checkpoint ids saved in the db
     return list(all_threads)
+
+def save_thread_name(thread_id, thread_name):
+    cursor = conn.cursor()
+    cursor.execute("""
+        INSERT INTO thread_names (thread_id, thread_name, created_at, updated_at)
+        VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ON CONFLICT(thread_id) DO UPDATE SET
+            thread_name = excluded.thread_name,
+            updated_at = CURRENT_TIMESTAMP
+    """, (str(thread_id), thread_name))
+    conn.commit()
+
+def get_thread_name(thread_id):
+    """Retrieve thread name from database"""
+    cursor = conn.cursor()
+    cursor.execute('SELECT thread_name FROM thread_names WHERE thread_id = ?', (str(thread_id),))
+    result = cursor.fetchone()
+    return result[0] if result else None
+
+def get_all_thread_names():
+    """Retrieve all thread names from database"""
+    cursor = conn.cursor()
+    # Get latest thread first
+    cursor.execute('SELECT thread_id, thread_name FROM thread_names order by created_at')
+    results = cursor.fetchall()
+    return {str(row[0]): row[1] for row in results}
+
+# print(retrieve_all_threads())
+#print(get_all_thread_names())
+# print(get_thread_name('7aef5e9d-2b52-4b4a-9d09-9e86d749d39c'))
